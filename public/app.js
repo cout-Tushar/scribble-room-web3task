@@ -40,6 +40,8 @@ function Icon({ name, size = 20, ...props }) {
     copy: "M9 9h12v12H9zM5 15H3V3h12v2",
     check: "m5 12 4 4L19 6",
     close: "m6 6 12 12M6 18 18 6",
+    expand: "M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5",
+    collapse: "M3 8h5V3m8 0v5h5M8 21v-5H3m13 5v-5h5",
     undo: "M3 10h11a7 7 0 0 1 0 14M3 10l6-6M3 10l6 6",
     trash: "M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7",
     eraser: "m3 14 10-11 8 8-10 10H8l-5-4v-3Zm5-5 8 8M11 21h10",
@@ -624,9 +626,31 @@ function DrawingCanvas({ room, canDraw, color, size, tool, act, canvasApi }) {
   store.current.canDraw = canDraw;
   const point = (e) => {
     const b = ref.current.getBoundingClientRect();
+    // The phone's expanded board is rotated as one surface, including tools.
+    // Invert that rotation before normalizing to the shared logical canvas.
+    const rotated =
+      getComputedStyle(ref.current)
+        .getPropertyValue("--canvas-rotated")
+        .trim() === "1";
     return [
-      Math.max(0, Math.min(1, (e.clientX - b.left) / b.width)),
-      Math.max(0, Math.min(1, (e.clientY - b.top) / b.height)),
+      Math.max(
+        0,
+        Math.min(
+          1,
+          rotated
+            ? (e.clientY - b.top) / b.height
+            : (e.clientX - b.left) / b.width,
+        ),
+      ),
+      Math.max(
+        0,
+        Math.min(
+          1,
+          rotated
+            ? 1 - (e.clientX - b.left) / b.width
+            : (e.clientY - b.top) / b.height,
+        ),
+      ),
     ];
   };
   const flush = (continuing = false) => {
@@ -829,7 +853,8 @@ function App() {
     [notice, setNotice] = S(""),
     [rejoin, setRejoin] = S(false),
     [confirm, setConfirm] = S(null),
-    [celebrating, setCelebrating] = S(false);
+    [celebrating, setCelebrating] = S(false),
+    [expanded, setExpanded] = S(false);
   const roomRef = R(null),
     canvasApi = R(null),
     intentionalLeave = R(false),
@@ -837,7 +862,8 @@ function App() {
     noticeTimer = R(null),
     pendingTimers = R(new Set()),
     playerNodes = R(new Map()),
-    playerPositions = R(new Map());
+    playerPositions = R(new Map()),
+    expandButton = R(null);
   E(() => {
     const onConnect = () => {
       setConnected(true);
@@ -845,6 +871,7 @@ function App() {
     };
     const onDisconnect = () => {
       setConnected(false);
+      setExpanded(false);
       setBusy(false);
       canvasApi.current?.cancel();
       if (!intentionalLeave.current && roomRef.current) {
@@ -894,6 +921,22 @@ function App() {
       socket.off("connect_error", onError);
     };
   }, []);
+  E(() => {
+    if (!expanded || !room) return;
+    const previousOverflow = document.documentElement.style.overflow;
+    document.documentElement.style.overflow = "hidden";
+    const onKey = (event) => {
+      if (event.key === "Escape" && !document.querySelector("dialog[open]")) {
+        setExpanded(false);
+        expandButton.current?.focus();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.documentElement.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [expanded, !!room]);
   E(() => {
     const nextPositions = new Map();
     playerNodes.current.forEach((node, id) => {
@@ -1035,7 +1078,13 @@ function App() {
   ) => h(Button, { onClick, variant, disabled, icon }, label);
   return h(
     "div",
-    { className: "shell" },
+    {
+      className: cn(
+        "shell",
+        room && "in-room",
+        expanded && room && "board-expanded",
+      ),
+    },
     h(
       "header",
       { className: "site-header" },
@@ -1324,6 +1373,21 @@ function App() {
                   },
                   h(Icon, { name: "clock", size: 18 }),
                   room.deadline ? seconds : "—",
+                ),
+                h(
+                  "button",
+                  {
+                    ref: expandButton,
+                    className: "expand-board",
+                    type: "button",
+                    title: expanded ? "Return to game" : "Expand drawing board",
+                    "aria-label": expanded
+                      ? "Return to game"
+                      : "Expand drawing board",
+                    "aria-pressed": expanded,
+                    onClick: () => setExpanded(!expanded),
+                  },
+                  h(Icon, { name: expanded ? "collapse" : "expand", size: 20 }),
                 ),
               ),
               h(

@@ -21,6 +21,7 @@ Run `npm run build` to syntax-check the JavaScript and produce `dist/`, a deploy
 - Settings: 2–20 players, 2–10 rounds, 15–240 seconds, 1–5 word choices, 0–5 hints, normal or hidden word mode.
 - Each player draws once per round. Word selection automatically falls back after 15 seconds. Turns finish when everyone guesses or time expires, followed by a four-second reveal.
 - Color palette, brush width, eraser, undo of the latest brush gesture, and clear canvas.
+- Stable phone board sizing and an expand button for a larger landscape drawing view.
 - Live guesses, exact case-insensitive trimmed matching, countdown, progressive hints, leaderboard and tied winners.
 - Drawer and successful guessers cannot send chat during drawing, preventing accidental spoilers.
 - Pop-art cream/orange/yellow/green design, custom SVG character avatars, illustrated home screen, responsive room setup and lobby, word selection countdown, reveal scores and final podium.
@@ -47,4 +48,4 @@ Deploy a single instance: rooms currently live in memory. Restarts clear games. 
 
 ## Validation
 
-The 11 automated tests verify every room phase's panel structure, the ticking selection countdown, canvas coordinate scaling and gesture cleanup, full two-round game completion, rematches, public matchmaking, ready state, private words, host/drawer permissions, grouped undo, clearing, scoring, invalid coordinates, host migration and fresh rejoining. Browser QA also covers two real players, synchronized drawing, guessing and score updates, plus phone-width layouts. Public deployment smoke testing remains necessary in the hosting environment.
+The 12 automated tests verify every room phase's panel structure, the ticking selection countdown, normal and rotated canvas coordinate scaling and gesture cleanup, full two-round game completion, rematches, public matchmaking, ready state, private words, host/drawer permissions, grouped undo, clearing, scoring, invalid coordinates, host migration and fresh rejoining. Browser QA also covers two real players, synchronized drawing, guessing and score updates, plus phone-width layouts. Public deployment smoke testing remains necessary in the hosting environment.

@@ -4,7 +4,7 @@ import vm from "node:vm";
 import { readFileSync } from "node:fs";
 import React from "react";
 
-function canvasHarness(canDraw = true) {
+function canvasHarness(canDraw = true, rotated = false) {
   const effects = [],
     sent = [],
     events = {},
@@ -41,6 +41,7 @@ function canvasHarness(canDraw = true) {
     cancelAnimationFrame() {},
     crypto: { randomUUID: () => "gesture-1" },
     performance: { now: () => clock },
+    getComputedStyle: () => ({ getPropertyValue: () => (rotated ? "1" : "0") }),
   };
   vm.createContext(context);
   vm.runInContext(
@@ -67,8 +68,8 @@ function canvasHarness(canDraw = true) {
     getBoundingClientRect: () => ({
       left: 20,
       top: 30,
-      width: 500,
-      height: 325,
+      width: rotated ? 325 : 500,
+      height: rotated ? 500 : 325,
     }),
     setPointerCapture() {},
   };
@@ -129,4 +130,16 @@ test("spectators cannot draw and cancelled gestures do not leak across turns", (
   artist.api.current.cancel();
   artist.element.props.onPointerUp(artist.pointer(70, 95));
   assert.equal(artist.sent.length, 0);
+});
+
+test("expanded portrait canvas maps rotated touch positions to unchanged drawing coordinates", () => {
+  const c = canvasHarness(true, true);
+  c.element.props.onPointerDown(c.pointer(280, 80));
+  c.element.props.onPointerMove(c.pointer(182.5, 280));
+  c.element.props.onPointerUp(c.pointer(182.5, 280));
+  const points = c.sent[0].payload.stroke.points;
+  assert.equal(points[0][0], 0.1);
+  assert.ok(Math.abs(points[0][1] - 0.2) < 1e-10);
+  assert.equal(points[1][0], 0.5);
+  assert.equal(points[1][1], 0.5);
 });

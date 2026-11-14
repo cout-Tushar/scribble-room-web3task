@@ -887,7 +887,7 @@ footer b {
 }
 .board-top {
   display: grid;
-  grid-template-columns: 58px minmax(0, 1fr) 58px;
+  grid-template-columns: 58px minmax(0, 1fr) 58px 34px;
   gap: 9px;
   align-items: center;
   min-height: 81px;
@@ -1542,7 +1542,7 @@ canvas.erasing {
     min-height: 330px;
   }
   .board-top {
-    grid-template-columns: 45px minmax(0, 1fr) 48px;
+    grid-template-columns: 45px minmax(0, 1fr) 48px 34px;
     padding: 13px 11px;
   }
   .word {
@@ -1843,7 +1843,7 @@ canvas.erasing {
     display: none;
   }
   .board-top {
-    grid-template-columns: 43px minmax(0, 1fr) 48px;
+    grid-template-columns: 32px minmax(0, 1fr) 44px 34px;
     gap: 6px;
     padding: 14px 10px;
     min-height: 76px;
@@ -1865,9 +1865,7 @@ canvas.erasing {
   .round-label b {
     font-size: 17px;
   }
-  .canvas-wrap:has(.overlay) {
-    min-height: 350px;
-  }
+  .canvas-wrap:has(.overlay),
   .canvas-wrap:not(:has(.overlay)) {
     min-height: 0;
   }
@@ -1969,6 +1967,192 @@ canvas.erasing {
   }
   .confirm-dialog h2 {
     font-size: 29px;
+  }
+}
+.expand-board {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 36px;
+  padding: 0;
+  background: var(--cream);
+  border: 1.5px solid var(--ink);
+  border-radius: 8px;
+}
+.canvas-wrap {
+  --canvas-rotated: 0;
+}
+.board-expanded > .site-header,
+.board-expanded > footer,
+.board-expanded .game-heading,
+.board-expanded .players,
+.board-expanded .chat,
+.board-expanded > .error,
+.board-expanded > .toast {
+  display: none;
+}
+.board-expanded .board {
+  position: fixed;
+  z-index: 40;
+  left: 12px;
+  top: 12px;
+  width: calc(100vw - 24px);
+  height: calc(100vh - 24px);
+  height: calc(100svh - 24px);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 76px;
+  grid-template-rows: 56px 4px minmax(0, 1fr);
+  box-shadow: none;
+}
+.board-expanded .board-top {
+  grid-column: 1 / -1;
+  min-height: 0;
+  padding: 5px 12px;
+}
+.board-expanded .time-track {
+  grid-column: 1 / -1;
+}
+.board-expanded .canvas-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  aspect-ratio: auto;
+  background: #e9eee2;
+  overflow: hidden;
+}
+.board-expanded canvas {
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  flex: 0 1 auto;
+}
+.board-expanded .toolbar {
+  display: flex;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+  gap: 10px;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  padding: 9px 4px;
+  border-top: 0;
+  border-left: 1.5px solid var(--ink);
+}
+.board-expanded .tool-group {
+  flex-shrink: 0;
+}
+.board-expanded .tool {
+  width: 28px;
+  height: 30px;
+}
+.board-expanded .colors {
+  grid-template-columns: repeat(2, 22px);
+  gap: 5px;
+}
+.board-expanded .swatch {
+  width: 22px;
+  height: 22px;
+}
+.board-expanded .brush-size {
+  flex: 0 0 auto;
+  min-width: 0;
+  width: 62px;
+  max-width: 100%;
+}
+.board-expanded .end-tools {
+  width: auto;
+  margin: auto 0 0;
+}
+.board-expanded .end-tools:before,
+.board-expanded .canvas-caption {
+  display: none;
+}
+
+@media (max-width: 720px) {
+  .shell.in-room {
+    padding-inline: 10px;
+  }
+  .in-room .site-header {
+    height: 65px;
+    gap: 8px;
+  }
+  .in-room nav {
+    gap: 6px;
+  }
+  .in-room .game-main {
+    padding-top: 12px;
+  }
+  .in-room .game-heading {
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .in-room .game-heading h2 {
+    display: none;
+  }
+  .in-room .board {
+    order: -1;
+  }
+  .in-room .guess-form input {
+    font-size: 16px !important;
+  }
+  .in-room .overlay {
+    padding: 10px;
+  }
+  .in-room .overlay h2 {
+    font-size: 20px;
+    margin: 6px 0;
+  }
+  .in-room .overlay p {
+    margin: 5px auto 9px;
+  }
+  .in-room .overlay-symbol,
+  .in-room .overlay .eyebrow,
+  .in-room .lobby-illustration,
+  .in-room .overlay .muted-block {
+    display: none;
+  }
+  .in-room .lobby-status {
+    margin: 10px 0;
+  }
+  .in-room .choices {
+    margin: 8px 0;
+  }
+  .in-room .podium {
+    margin: 10px 0;
+  }
+  .in-room .podium-place .avatar {
+    width: 30px;
+    height: 30px;
+  }
+  .in-room .podium-block {
+    height: 25px;
+  }
+  .in-room .place-0 .podium-block {
+    height: 40px;
+  }
+  .in-room .place-2 .podium-block {
+    height: 20px;
+  }
+}
+/* A landscape workspace inside the portrait viewport gives the actual canvas
+   more room without changing the 1000:650 ratio or the shared drawing. */
+@media (max-width: 720px) and (orientation: portrait) {
+  .board-expanded .board {
+    left: 50%;
+    top: 50%;
+    width: calc(100vh - 24px);
+    width: calc(100svh - 24px);
+    height: calc(100vw - 24px);
+    transform: translate(-50%, -50%) rotate(90deg);
+    border-radius: 12px;
+  }
+  .board-expanded .canvas-wrap {
+    --canvas-rotated: 1;
   }
 }
 @media (prefers-reduced-motion: reduce) {
