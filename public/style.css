@@ -2097,6 +2097,31 @@ canvas.erasing {
   .in-room .board {
     order: -1;
   }
+  .in-room .game-grid {
+    gap: 12px;
+  }
+  .in-room .players {
+    order: 1;
+  }
+  .in-room .chat {
+    height: 240px;
+  }
+  .in-room .chat > h3 {
+    order: -2;
+    padding: 10px 12px;
+  }
+  .in-room .guess-form {
+    order: -1;
+    flex-shrink: 0;
+    padding: 8px 10px;
+    border-top: 0;
+    border-bottom: 1px solid #e3e9d9;
+  }
+  .in-room .chat-tip,
+  .in-room .canvas-caption,
+  .in-room:not(.board-expanded) .toolbar:has(.tool:disabled) {
+    display: none;
+  }
   .in-room .guess-form input {
     font-size: 16px !important;
   }
