@@ -1,57 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { io } from "socket.io-client";
-import { createApp } from "../server.js";
-
-async function fixture(t) {
-  const app = createApp();
-  await new Promise((resolve) => app.http.listen(0, "127.0.0.1", resolve));
-  const url = `http://127.0.0.1:${app.http.address().port}`;
-  const clients = [];
-  t.after(() => {
-    clients.forEach((s) => s.disconnect());
-    app.close();
-  });
-  const connect = async () => {
-    const socket = io(url, { autoConnect: false, reconnection: false });
-    clients.push(socket);
-    socket.on("state", (state) => {
-      socket.state = state;
-    });
-    await new Promise((resolve, reject) => {
-      socket.once("connect", resolve);
-      socket.once("connect_error", reject);
-      socket.connect();
-    });
-    return socket;
-  };
-  const action = (socket, type, payload = {}) =>
-    new Promise((resolve, reject) => {
-      socket
-        .timeout(3000)
-        .emit("action", { type, ...payload }, (error, value) =>
-          error ? reject(error) : resolve(value),
-        );
-    });
-  const until = (socket, predicate) =>
-    socket.state && predicate(socket.state)
-      ? Promise.resolve(socket.state)
-      : new Promise((resolve, reject) => {
-          const timeout = setTimeout(() => {
-            socket.off("state", onState);
-            reject(Error("Timed out waiting for phase"));
-          }, 6000);
-          function onState(state) {
-            if (predicate(state)) {
-              clearTimeout(timeout);
-              socket.off("state", onState);
-              resolve(state);
-            }
-          }
-          socket.on("state", onState);
-        });
-  return { app, connect, action, until, url };
-}
+import { fixture } from "./helpers.ts";
+import type { Stroke } from "../shared/game";
 
 test(
   "complete two-round game reaches final scores and host can rematch",
@@ -67,7 +17,7 @@ test(
     });
     await action(b, "join", { name: "Pickle", code: a.state.code });
     await action(b, "ready");
-    assert.equal(b.state.players.find((p) => p.id === b.id).ready, true);
+    assert.equal(b.state.players.find((p) => p.id === b.id)!.ready, true);
     await action(a, "start");
     for (let turn = 0; turn < 4; turn++) {
       const drawer = turn % 2 ? b : a,
@@ -84,7 +34,7 @@ test(
       assert.equal(guesser.state.word, null);
       assert.deepEqual(guesser.state.options, []);
       assert.ok((await action(drawer, "guess", { text: "spoiler" })).error);
-      const stroke = {
+      const stroke: Stroke = {
         id: "gesture-" + turn,
         color: "#ff743d",
         size: 8,
@@ -169,7 +119,7 @@ test(
     const returning = await connect();
     await action(returning, "join", { name: "Host", code });
     assert.equal(
-      returning.state.players.find((p) => p.id === returning.id).score,
+      returning.state.players.find((p) => p.id === returning.id)!.score,
       0,
     );
     assert.equal([...app.rooms.values()][0].players.length, 2);

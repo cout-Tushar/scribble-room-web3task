@@ -1,6 +1,6 @@
 # Scribble Room
 
-A multiplayer Pictionary game built with React, Express, HTML5 Canvas, and Socket.IO. Create a private room, share its invite link, and draw and guess with friends. Public matchmaking joins available public lobbies.
+A multiplayer Pictionary game built with TypeScript, React, Express, HTML5 Canvas, and Socket.IO. Create a private room, share its invite link, and draw and guess with friends. Public matchmaking joins available public lobbies.
 
 ## Run locally
 
@@ -8,12 +8,16 @@ Requires Node.js 22 or newer.
 
 ```sh
 npm ci
-npm start
+npm run dev
 ```
 
 Open http://localhost:3000 in two browser tabs, use different nicknames, create a room in one and join by code in the other. The host starts the game. Run `npm test` for the frontend regression checks and real two-client Socket.IO integration tests.
 
-Run `npm run build` to syntax-check the JavaScript and produce `dist/`, a deployable copy of the frontend and unchanged Node backend. In that directory, run `npm ci --omit=dev` and `npm start`. No bundler or TypeScript compiler is needed for this existing buildless React stack.
+`npm run dev` compiles and watches TypeScript, restarts the compiled server when it changes, and copies updated HTML/CSS assets. Refresh the browser after frontend edits.
+
+Run `npm run typecheck` for strict checking across the frontend, server, shared protocol, build scripts, and tests. `npm run build` checks types and compiles with esbuild into `dist/`; then `npm start` serves the production build. For a standalone deployment, copy `dist/`, run `npm ci --omit=dev` inside it, then `npm start`. TypeScript tooling is only needed while building.
+
+Source lives in `client/app.ts`, `server.ts`, `shared/game.ts`, `scripts/*.ts`, and `test/*.ts`. `public/` contains HTML/CSS assets. Generated JavaScript and source maps stay in the ignored `dist/` directory.
 
 ## Features
 
@@ -30,11 +34,11 @@ Run `npm run build` to syntax-check the JavaScript and produce `dist/`, a deploy
 
 ## Architecture and walkthrough
 
-`server.js` owns all authoritative room state in memory. `createApp()` creates isolated HTTP and Socket.IO servers, which also makes integration tests independent. Each room contains its roster, host, settings, turn order, score totals, canvas strokes and bounded chat history.
+`server.ts` owns all authoritative room state in memory. `createApp()` creates isolated HTTP and Socket.IO servers, which also makes integration tests independent. Each room contains its roster, host, settings, turn order, score totals, canvas strokes and bounded chat history.
 
 The lifecycle is lobby → choosing → drawing → reveal → next turn → finished. Every player receives a personalized `state` event: only the drawer gets word choices and the secret word before reveal. The server validates room capacity, start permissions, word choices, drawing authority, stroke coordinates and sizes. Messages have size and rate limits. Names and chat render as React text rather than HTML.
 
-`public/app.js` renders React without a build step using locally served production React bundles. It separates reusable controls, SVG artwork, setup, chat, podium, dialog, and drawing into components. See `FRONTEND.md` for the screen-to-server contract map. Pointer coordinates are normalized to 0–1 against a fixed 1000×650 logical canvas so the shared drawing scales consistently. The canvas stores incoming strokes and optimistic outgoing segments in refs, redraws at most once per animation frame, and streams segments approximately every 40 milliseconds without updating React state. White strokes implement the eraser. Undo groups transmitted segments by gesture ID and removes the last complete gesture. All game actions use the `action` event with an acknowledgement containing success or an error.
+`client/app.ts` compiles to the browser script at `dist/public/app.js`, using locally served React 18 bundles. `shared/game.ts` defines room state, players, drawing strokes, action payloads and typed Socket.IO events; the frontend and server consume the same protocol. It separates reusable controls, SVG artwork, setup, chat, podium, dialog, and drawing into components. See `FRONTEND.md` for the screen-to-server contract map. Pointer coordinates are normalized to 0–1 against a fixed 1000×650 logical canvas so the shared drawing scales consistently. The canvas stores incoming strokes and optimistic outgoing segments in refs, redraws at most once per animation frame, and streams segments approximately every 40 milliseconds without updating React state. White strokes implement the eraser. Undo groups transmitted segments by gesture ID and removes the last complete gesture. All game actions use the `action` event with an acknowledgement containing success or an error.
 
 Correct guesses earn 100 base points plus up to 400 based on remaining time. The drawer receives 100 per successful guess. A player scores only once per turn. Partial matches do not count. The server controls deadlines and scoring; client clocks only display the countdown.
 
@@ -42,7 +46,7 @@ Disconnecting removes the player, transfers host ownership, skips absent drawers
 
 ## Deployment
 
-The included `render.yaml` provisions a free Node web service with `npm ci --omit=dev && npm run build`, `npm start`, and `/health`. Node 22 is selected by `.node-version`. See [DEPLOYMENT.md](DEPLOYMENT.md) for the deployment steps. Render provides `PORT` automatically. Socket.IO uses the same origin as the frontend, so no separate frontend environment variables or CORS setup are needed.
+The included `render.yaml` provisions a free Node web service with `npm ci --include=dev && npm run build`, `npm start`, and `/health`. Node 22 is selected by `.node-version`. See [DEPLOYMENT.md](DEPLOYMENT.md) for the deployment steps. Render provides `PORT` automatically. Socket.IO uses the same origin as the frontend, so no separate frontend environment variables or CORS setup are needed.
 
 Deploy a single instance: rooms currently live in memory. Restarts clear games. Horizontal scaling requires shared room persistence, a Socket.IO adapter and compatible session routing. This server needs persistent WebSocket connections and does not fit a standalone Vercel/Netlify serverless deployment. Free hosting may sleep when idle; allow time for the first request to wake it.
 

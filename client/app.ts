@@ -1,4 +1,72 @@
-/* Scribble Room · buildless React, real Socket.IO rooms. */
+/* Scribble Room · typed React frontend and real Socket.IO rooms. */
+import type {
+  Settings as GameSettings,
+  RoomState,
+  Player,
+  Stroke,
+  Point,
+  GameAction,
+  ActionArgs,
+} from "../shared/game";
+import type {
+  Dispatch,
+  SetStateAction,
+  MutableRefObject,
+  ButtonHTMLAttributes,
+  SVGProps,
+  CSSProperties,
+  ChangeEvent,
+  FormEvent,
+  MouseEvent,
+  SyntheticEvent,
+  PointerEvent as ReactPointerEvent,
+} from "react";
+type Setter<T> = Dispatch<SetStateAction<T>>;
+type Act = (...args: ActionArgs) => void;
+type Join = (type: "create" | "join", extra?: { random?: boolean }) => void;
+type Confirmation =
+  | { type: "leave" | "clear" }
+  | { type: "invite"; url: string };
+interface CanvasApi {
+  replace: (strokes: Stroke[]) => void;
+  cancel: () => void;
+}
+interface ActiveStroke extends Stroke {
+  pointerId: number;
+}
+interface CanvasStore {
+  strokes: Stroke[];
+  pending: Map<number, Stroke>;
+  active: ActiveStroke | null;
+  frame: number;
+  seq: number;
+  lastFlush: number;
+  canDraw: boolean;
+}
+interface DrawingCanvasProps {
+  room: Pick<RoomState, "strokes">;
+  canDraw: boolean;
+  color: string;
+  size: number;
+  tool: string;
+  act: Act;
+  canvasApi: MutableRefObject<CanvasApi | null>;
+}
+interface SettingsProps {
+  settings: GameSettings;
+  setSettings: Setter<GameSettings>;
+}
+interface WelcomeProps extends SettingsProps {
+  name: string;
+  setName: Setter<string>;
+  code: string;
+  setCode: Setter<string>;
+  join: Join;
+  busy: boolean;
+  connected: boolean;
+  rejoin: boolean;
+}
+
 const h = React.createElement;
 const { useState: S, useEffect: E, useRef: R } = React;
 const socket = io();
@@ -14,7 +82,8 @@ const COLORS = [
   "#f18db2",
   "#a57550",
 ];
-const DEFAULTS = {
+
+const DEFAULTS: GameSettings = {
   maxPlayers: 8,
   rounds: 3,
   drawTime: 80,
@@ -23,7 +92,9 @@ const DEFAULTS = {
   private: true,
   mode: "normal",
 };
-const cn = (...parts) => parts.filter(Boolean).join(" ");
+
+const cn = (...parts: (string | boolean | null | undefined)[]) =>
+  parts.filter(Boolean).join(" ");
 function savedName() {
   try {
     return localStorage.getItem("scribble-name") || "";
@@ -31,8 +102,13 @@ function savedName() {
     return "";
   }
 }
-function Icon({ name, size = 20, ...props }) {
-  const paths = {
+
+function Icon({
+  name,
+  size = 20,
+  ...props
+}: SVGProps<SVGSVGElement> & { name: string; size?: number }) {
+  const paths: Record<string, string> = {
     arrow: "M4 12h16m-6-6 6 6-6 6",
     pencil: "m4 16-1 5 5-1L21 7l-4-4L4 16Zm10-10 4 4",
     people:
@@ -68,12 +144,16 @@ function Icon({ name, size = 20, ...props }) {
     h("path", { d: paths[name] || paths.star }),
   );
 }
+
 function Button({
   children,
   icon,
   variant = "primary",
   className = "",
   ...props
+}: ButtonHTMLAttributes<HTMLButtonElement> & {
+  icon?: string;
+  variant?: string;
 }) {
   return h(
     "button",
@@ -82,6 +162,7 @@ function Button({
     icon && h(Icon, { name: icon }),
   );
 }
+
 function Avatar({ seed = "", size = 44 }) {
   const n = [...seed].reduce((a, c) => a + c.charCodeAt(0), 0) % 4;
   return h(
@@ -137,6 +218,7 @@ function Avatar({ seed = "", size = 44 }) {
     h("circle", { cx: 45, cy: 37, r: 3, fill: "#ffab8e" }),
   );
 }
+
 function HeroArt() {
   return h(
     "div",
@@ -243,8 +325,15 @@ function HeroArt() {
     h("span", { className: "art-sticker" }, "100% talent optional ✦"),
   );
 }
-function Settings({ settings, setSettings }) {
-  const field = (label, key, min, max, unit = "") =>
+
+function Settings({ settings, setSettings }: SettingsProps) {
+  const field = (
+    label: string,
+    key: "maxPlayers" | "rounds" | "drawTime" | "wordCount" | "hints",
+    min: number,
+    max: number,
+    unit = "",
+  ) =>
     h(
       "label",
       { className: "range-field", key },
@@ -256,8 +345,8 @@ function Settings({ settings, setSettings }) {
         value: settings[key],
         style: {
           "--range-progress": `${((settings[key] - min) / (max - min)) * 100}%`,
-        },
-        onChange: (e) =>
+        } as CSSProperties,
+        onChange: (e: ChangeEvent<HTMLInputElement>) =>
           setSettings({ ...settings, [key]: Number(e.target.value) }),
       }),
     );
@@ -277,7 +366,11 @@ function Settings({ settings, setSettings }) {
         "select",
         {
           value: settings.mode,
-          onChange: (e) => setSettings({ ...settings, mode: e.target.value }),
+          onChange: (e: ChangeEvent<HTMLSelectElement>) =>
+            setSettings({
+              ...settings,
+              mode: e.currentTarget.value === "hidden" ? "hidden" : "normal",
+            }),
         },
         h("option", { value: "normal" }, "Letters + hints"),
         h("option", { value: "hidden" }, "Mystery word"),
@@ -296,12 +389,13 @@ function Settings({ settings, setSettings }) {
         type: "checkbox",
         role: "switch",
         checked: settings.private,
-        onChange: (e) =>
+        onChange: (e: ChangeEvent<HTMLInputElement>) =>
           setSettings({ ...settings, private: e.target.checked }),
       }),
     ),
   );
 }
+
 function Welcome({
   name,
   setName,
@@ -313,8 +407,8 @@ function Welcome({
   busy,
   connected,
   rejoin,
-}) {
-  const [tab, setTab] = S(code ? "join" : "create");
+}: WelcomeProps) {
+  const [tab, setTab] = S<"join" | "create">(code ? "join" : "create");
   return h(
     "main",
     { className: "welcome" },
@@ -397,7 +491,7 @@ function Welcome({
       h(
         "div",
         { className: "tabs", role: "tablist", "aria-label": "Room action" },
-        ...["create", "join"].map((t) =>
+        ...(["create", "join"] as const).map((t) =>
           h(
             "button",
             {
@@ -414,7 +508,7 @@ function Welcome({
       h(
         "form",
         {
-          onSubmit: (e) => {
+          onSubmit: (e: FormEvent<HTMLFormElement>) => {
             e.preventDefault();
             join(tab);
           },
@@ -541,11 +635,20 @@ function Welcome({
     ),
   );
 }
+
 // Canvas updates never pass through React state. Canonical strokes and optimistic
 // segments are merged by gesture id + segment index until acknowledged.
-function DrawingCanvas({ room, canDraw, color, size, tool, act, canvasApi }) {
-  const ref = R(null),
-    store = R({
+function DrawingCanvas({
+  room,
+  canDraw,
+  color,
+  size,
+  tool,
+  act,
+  canvasApi,
+}: DrawingCanvasProps) {
+  const ref = R<HTMLCanvasElement | null>(null),
+    store = R<CanvasStore>({
       strokes: [],
       pending: new Map(),
       active: null,
@@ -554,15 +657,17 @@ function DrawingCanvas({ room, canDraw, color, size, tool, act, canvasApi }) {
       lastFlush: 0,
       canDraw: false,
     });
+
   const paint = () => {
     const s = store.current,
       c = ref.current;
     if (!c) return;
     const ctx = c.getContext("2d");
+    if (!ctx) return;
     ctx.clearRect(0, 0, 1000, 650);
     ctx.fillStyle = "#fff";
     ctx.fillRect(0, 0, 1000, 650);
-    const draw = (stroke) => {
+    const draw = (stroke: Stroke) => {
       ctx.strokeStyle = stroke.color;
       ctx.fillStyle = stroke.color;
       ctx.lineWidth = stroke.size;
@@ -585,17 +690,19 @@ function DrawingCanvas({ room, canDraw, color, size, tool, act, canvasApi }) {
         ctx.fill();
       }
     };
+
     s.strokes.forEach(draw);
     s.pending.forEach(draw);
     if (s.active) draw(s.active);
     s.frame = 0;
   };
+
   const schedule = () => {
     if (!store.current.frame)
       store.current.frame = requestAnimationFrame(paint);
   };
   E(() => {
-    const onCanvas = (strokes) => {
+    const onCanvas = (strokes: Stroke[]) => {
       store.current.strokes = strokes;
       schedule();
     };
@@ -608,6 +715,7 @@ function DrawingCanvas({ room, canDraw, color, size, tool, act, canvasApi }) {
         schedule();
       },
     };
+
     onCanvas(room.strokes || []);
     return () => {
       socket.off("canvas", onCanvas);
@@ -615,6 +723,7 @@ function DrawingCanvas({ room, canDraw, color, size, tool, act, canvasApi }) {
       canvasApi.current = null;
     };
   }, []);
+
   E(() => {
     store.current.strokes = room.strokes || [];
     if (!canDraw) {
@@ -624,12 +733,12 @@ function DrawingCanvas({ room, canDraw, color, size, tool, act, canvasApi }) {
     schedule();
   }, [room.strokes, canDraw]);
   store.current.canDraw = canDraw;
-  const point = (e) => {
-    const b = ref.current.getBoundingClientRect();
+  const point = (e: ReactPointerEvent<HTMLCanvasElement>): Point => {
+    const b = ref.current!.getBoundingClientRect();
     // The phone's expanded board is rotated as one surface, including tools.
     // Invert that rotation before normalizing to the shared logical canvas.
     const rotated =
-      getComputedStyle(ref.current)
+      getComputedStyle(ref.current!)
         .getPropertyValue("--canvas-rotated")
         .trim() === "1";
     return [
@@ -653,6 +762,7 @@ function DrawingCanvas({ room, canDraw, color, size, tool, act, canvasApi }) {
       ),
     ];
   };
+
   const flush = (continuing = false) => {
     const s = store.current,
       a = s.active;
@@ -660,7 +770,9 @@ function DrawingCanvas({ room, canDraw, color, size, tool, act, canvasApi }) {
     const sent = { ...a, points: [...a.points] },
       key = s.seq++;
     s.pending.set(key, sent);
-    s.active = continuing ? { ...a, points: [a.points.at(-1)] } : null;
+    s.active = continuing
+      ? { ...a, points: [a.points[a.points.length - 1]] }
+      : null;
     s.lastFlush = performance.now();
     act("stroke", { stroke: sent }, () => {
       s.pending.delete(key);
@@ -668,6 +780,7 @@ function DrawingCanvas({ room, canDraw, color, size, tool, act, canvasApi }) {
     });
     schedule();
   };
+
   return h("canvas", {
     ref,
     width: 1000,
@@ -691,6 +804,7 @@ function DrawingCanvas({ room, canDraw, color, size, tool, act, canvasApi }) {
       store.current.lastFlush = performance.now();
       schedule();
     },
+
     onPointerMove: (e) => {
       const s = store.current;
       if (!s.active || s.active.pointerId !== e.pointerId) return;
@@ -699,19 +813,33 @@ function DrawingCanvas({ room, canDraw, color, size, tool, act, canvasApi }) {
         flush(true);
       schedule();
     },
+
     onPointerUp: (e) => {
       if (store.current.active?.pointerId === e.pointerId) flush();
     },
+
     onPointerCancel: () => flush(),
     onLostPointerCapture: () => flush(),
   });
 }
-function Chat({ room, drawer, act, connected }) {
+
+function Chat({
+  room,
+  drawer,
+  act,
+  connected,
+}: {
+  room: RoomState;
+  drawer: boolean;
+  act: Act;
+  connected: boolean;
+}) {
   const [text, setText] = S(""),
     [sending, setSending] = S(false),
-    log = R(null);
+    log = R<HTMLDivElement | null>(null);
   const locked =
-    room.phase === "drawing" && (drawer || room.guessed.includes(socket.id));
+    room.phase === "drawing" &&
+    (drawer || room.guessed.includes(socket.id || ""));
   E(() => {
     if (log.current) log.current.scrollTop = log.current.scrollHeight;
   }, [room.messages]);
@@ -769,7 +897,7 @@ function Chat({ room, drawer, act, connected }) {
       "form",
       {
         className: "guess-form",
-        onSubmit: (e) => {
+        onSubmit: (e: FormEvent<HTMLFormElement>) => {
           e.preventDefault();
           if (!text.trim() || locked || sending) return;
           setSending(true);
@@ -815,7 +943,8 @@ function Chat({ room, drawer, act, connected }) {
     ),
   );
 }
-function Podium({ players }) {
+
+function Podium({ players }: { players: Player[] }) {
   const top = [...players].sort((a, b) => b.score - a.score).slice(0, 3);
   return h(
     "div",
@@ -838,8 +967,9 @@ function Podium({ players }) {
       ),
   );
 }
+
 function App() {
-  const [room, setRoom] = S(null),
+  const [room, setRoom] = S<RoomState | null>(null),
     [name, setName] = S(savedName()),
     [code, setCode] = S(new URLSearchParams(location.search).get("room") || ""),
     [error, setError] = S(""),
@@ -852,18 +982,18 @@ function App() {
     [settings, setSettings] = S({ ...DEFAULTS }),
     [notice, setNotice] = S(""),
     [rejoin, setRejoin] = S(false),
-    [confirm, setConfirm] = S(null),
+    [confirm, setConfirm] = S<Confirmation | null>(null),
     [celebrating, setCelebrating] = S(false),
     [expanded, setExpanded] = S(false);
-  const roomRef = R(null),
-    canvasApi = R(null),
+  const roomRef = R<RoomState | null>(null),
+    canvasApi = R<CanvasApi | null>(null),
     intentionalLeave = R(false),
-    celebrateTimer = R(null),
-    noticeTimer = R(null),
-    pendingTimers = R(new Set()),
-    playerNodes = R(new Map()),
-    playerPositions = R(new Map()),
-    expandButton = R(null);
+    celebrateTimer = R<ReturnType<typeof setTimeout> | undefined>(undefined),
+    noticeTimer = R<ReturnType<typeof setTimeout> | undefined>(undefined),
+    pendingTimers = R(new Set<ReturnType<typeof setTimeout>>()),
+    playerNodes = R(new Map<string, HTMLElement>()),
+    playerPositions = R(new Map<string, DOMRect>()),
+    expandButton = R<HTMLButtonElement | null>(null);
   E(() => {
     const onConnect = () => {
       setConnected(true);
@@ -884,11 +1014,13 @@ function App() {
       setRoom(null);
       roomRef.current = null;
     };
-    const onState = (r) => {
+
+    const onState = (r: RoomState) => {
       const prev = roomRef.current;
       if (!prev) window.scrollTo({ top: 0, behavior: "instant" });
       if (
-        (r.guessed.includes(socket.id) && !prev?.guessed.includes(socket.id)) ||
+        (r.guessed.includes(socket.id || "") &&
+          !prev?.guessed.includes(socket.id || "")) ||
         (r.phase === "finished" && prev?.phase !== "finished")
       ) {
         setCelebrating(true);
@@ -925,7 +1057,7 @@ function App() {
     if (!expanded || !room) return;
     const previousOverflow = document.documentElement.style.overflow;
     document.documentElement.style.overflow = "hidden";
-    const onKey = (event) => {
+    const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape" && !document.querySelector("dialog[open]")) {
         setExpanded(false);
         expandButton.current?.focus();
@@ -958,9 +1090,10 @@ function App() {
           { duration: 350, easing: "cubic-bezier(.2,.8,.2,1)" },
         );
     });
+
     playerPositions.current = nextPositions;
   }, [room?.players]);
-  const act = (type, extra = {}, done = () => {}) => {
+  const act: Act = (type, extra = {}, done = () => {}) => {
     if (!socket.connected) {
       setError("Still reconnecting. Give us a moment.");
       done(false);
@@ -978,21 +1111,23 @@ function App() {
       done(false);
     }, 7000);
     pendingTimers.current.add(timer);
-    socket.emit("action", { type, ...extra }, (result) => {
+    socket.emit("action", { type, ...extra } as GameAction, (result) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
       pendingTimers.current.delete(timer);
       if (result?.error)
         setError(
-          result.error === "Room not found." && extra.random
+          result.error === "Room not found." &&
+            "random" in extra &&
+            extra.random
             ? "No public rooms are open yet. Create a room and switch off “Private party” to start one."
             : result.error,
         );
       done(!result?.error);
     });
   };
-  const join = (type, extra = {}) => {
+  const join: Join = (type, extra = {}) => {
     if (busy) return;
     if (!name.trim()) {
       setError("Every great artist needs a name. Add your nickname first.");
@@ -1012,18 +1147,21 @@ function App() {
       localStorage.setItem("scribble-name", name.trim());
     } catch {}
     setBusy(true);
-    act(
-      type,
-      { name: name.trim(), code: code.trim(), settings, ...extra },
-      () => setBusy(false),
-    );
+    if (type === "create")
+      act("create", { name: name.trim(), settings }, () => setBusy(false));
+    else
+      act("join", { name: name.trim(), code: code.trim(), ...extra }, () =>
+        setBusy(false),
+      );
   };
-  const toast = (message) => {
+
+  const toast = (message: string) => {
     setNotice(message);
     clearTimeout(noticeTimer.current);
     noticeTimer.current = setTimeout(() => setNotice(""), 4000);
   };
   const invite = async () => {
+    if (!room) return;
     const url = location.origin + "/?room=" + room.code;
     try {
       await navigator.clipboard.writeText(url);
@@ -1032,6 +1170,7 @@ function App() {
       setConfirm({ type: "invite", url });
     }
   };
+
   const leave = () => {
     intentionalLeave.current = true;
     socket.disconnect();
@@ -1046,6 +1185,7 @@ function App() {
     setConfirm(null);
     window.scrollTo({ top: 0, behavior: "instant" });
   };
+
   const drawer = room?.drawer === socket.id,
     host = room?.host === socket.id,
     canDraw = drawer && room?.phase === "drawing" && connected;
@@ -1070,11 +1210,11 @@ function App() {
     finished: "THAT’S A MASTERPIECE",
   };
   const button = (
-    label,
-    onClick,
+    label: string,
+    onClick: () => void,
     variant = "primary",
     disabled = false,
-    icon,
+    icon?: string,
   ) => h(Button, { onClick, variant, disabled, icon }, label);
   return h(
     "div",
@@ -1093,7 +1233,7 @@ function App() {
         {
           className: "brand",
           href: "/",
-          onClick: (e) => {
+          onClick: (e: MouseEvent<HTMLAnchorElement>) => {
             if (room) {
               e.preventDefault();
               setConfirm({ type: "leave" });
@@ -1813,13 +1953,22 @@ function App() {
       }),
   );
 }
-function ConfirmDialog({ confirm, onCancel, onAccept }) {
-  const dialog = R(null);
+
+function ConfirmDialog({
+  confirm,
+  onCancel,
+  onAccept,
+}: {
+  confirm: Confirmation;
+  onCancel: () => void;
+  onAccept: () => void;
+}) {
+  const dialog = R<HTMLDialogElement | null>(null);
   E(() => {
     const previous = document.activeElement;
-    dialog.current.showModal();
+    dialog.current?.showModal();
     return () => {
-      previous?.focus();
+      if (previous instanceof HTMLElement) previous.focus();
     };
   }, []);
   return h(
@@ -1827,7 +1976,7 @@ function ConfirmDialog({ confirm, onCancel, onAccept }) {
     {
       ref: dialog,
       className: "confirm-dialog",
-      onCancel: (e) => {
+      onCancel: (e: SyntheticEvent<HTMLDialogElement>) => {
         e.preventDefault();
         onCancel();
       },
@@ -1881,4 +2030,8 @@ function ConfirmDialog({ confirm, onCancel, onAccept }) {
     ),
   );
 }
-ReactDOM.createRoot(document.getElementById("root")).render(h(App));
+
+ReactDOM.createRoot(document.getElementById("root")!).render(h(App));
+
+export type { CanvasApi, DrawingCanvasProps };
+export type CanvasComponent = typeof DrawingCanvas;

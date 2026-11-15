@@ -1,6 +1,6 @@
 # Frontend contract and implementation
 
-The existing Express server serves a buildless React 18 app and local React UMD bundles. Socket.IO shares its HTTP origin. No authentication or persistent session exists. The backend remains unchanged.
+The TypeScript Express server serves the compiled React 18 frontend and local React UMD bundles. Socket.IO shares its HTTP origin. Shared types in `shared/game.ts` describe the wire protocol. Runtime validation still checks untrusted input; TypeScript does not replace those checks. No authentication or persistent session exists.
 
 | Experience      | Existing contract                                                                                                                                                                                                     |
 | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -16,4 +16,4 @@ The existing Express server serves a buildless React 18 app and local React UMD 
 
 All actions return `{ ok: true }` or `{ error }` acknowledgements. Secret words and options are never inferred on guessing clients. Drawing broadcasts bypass React state, use an animation-frame canvas scheduler, and preserve a fixed logical aspect ratio on all screens. Socket listeners, timers, pointer gestures and observers are cleaned up.
 
-The visual system uses cream #FFF9EB, forest #20382B, orange #FF743D, yellow #FFD93D and green #A8E65C, with custom SVG characters and CSS motion respecting reduced-motion preferences. The project retains its no-bundler architecture; `npm run build` syntax-checks and packages the actual served frontend into `dist`.
+The visual system uses cream #FFF9EB, forest #20382B, orange #FF743D, yellow #FFD93D and green #A8E65C, with custom SVG characters and CSS motion respecting reduced-motion preferences. `npm run build` runs strict TypeScript checking and uses esbuild to compile `client/app.ts` and `server.ts` into `dist/`. The existing React element structure, responsive layouts and socket behavior are preserved.
